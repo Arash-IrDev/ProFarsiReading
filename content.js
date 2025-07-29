@@ -35,7 +35,7 @@ function toggleFont() {
   }
 }
 
-// ✅ Observer برای عناصر جدید
+// Observer for new elements
 let fontSizeObserver = null;
 
 function setupFontSizeObserver() {
@@ -48,9 +48,9 @@ function setupFontSizeObserver() {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            // اعمال سایز فونت روی عناصر جدید
+            // Apply font size to new elements
             applyFontSizeToElement(node);
-            // بررسی فرزندان
+            // Check children
             const children = node.querySelectorAll('*');
             children.forEach(child => applyFontSizeToElement(child));
           }
@@ -72,17 +72,17 @@ function applyFontSizeToElement(element) {
   const currentSize = parseFloat(computedStyle.fontSize);
   
   if (!isNaN(currentSize) && currentSize > 0) {
-    // اگر قبلاً سایز فونت تنظیم شده، آن را حفظ کن
+    // If font size is already set, keep it
     const existingSize = element.style.fontSize;
     if (existingSize) {
-      return; // قبلاً تنظیم شده
+      return; // Already set
     }
   }
 }
 
-// ✅ سیستم ساده مدیریت سایز فونت
+// Simple font size management system
 function changeFontSize(delta) {
-  // تغییر سایز فونت روی همه عناصر متنی
+  // Change font size on all text elements
   const textElements = document.querySelectorAll('p, div, span, a, li, td, th, input, textarea, select, button, label, h1, h2, h3, h4, h5, h6, article, section, nav, aside, header, footer, main');
   
   textElements.forEach(element => {
@@ -92,31 +92,45 @@ function changeFontSize(delta) {
     if (!isNaN(currentSize) && currentSize > 0) {
       const newSize = Math.max(8, Math.min(32, currentSize + delta));
       element.style.fontSize = newSize + 'px';
+      
+      // Adjust line-height proportionally to font size
+      const newLineHeight = Math.max(1.2, (newSize + 4) / newSize); // Minimum 1.2 and maximum proportional to size
+      element.style.lineHeight = newLineHeight;
+      
+      // Adjust letter-spacing for better readability of larger fonts
+      if (newSize > 16) {
+        const letterSpacing = Math.min(0.5, (newSize - 16) * 0.02); // Maximum 0.5px
+        element.style.letterSpacing = letterSpacing + 'px';
+      } else {
+        element.style.letterSpacing = '';
+      }
     }
   });
 }
 
 function resetFontSize() {
-  // حذف تمام تنظیمات font-size اضافی
+  // Remove all font-size, line-height and letter-spacing settings
   const textElements = document.querySelectorAll('p, div, span, a, li, td, th, input, textarea, select, button, label, h1, h2, h3, h4, h5, h6, article, section, nav, aside, header, footer, main');
   
   textElements.forEach(element => {
     element.style.fontSize = '';
+    element.style.lineHeight = '';
+    element.style.letterSpacing = '';
   });
 }
 
-// ✅ پیام‌ها از background
+// Messages from background
 chrome.runtime.onMessage.addListener((msg) => {
   switch (msg.action) {
     case "toggle-font":
       toggleFont();
       break;
     case "increase-font-size":
-      changeFontSize(1); // تغییر 1 پیکسلی
+      changeFontSize(1); // 1 pixel change
       setupFontSizeObserver();
       break;
     case "decrease-font-size":
-      changeFontSize(-1); // تغییر 1 پیکسلی
+      changeFontSize(-1); // 1 pixel change
       setupFontSizeObserver();
       break;
     case "reset-font-size":
