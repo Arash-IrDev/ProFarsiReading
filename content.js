@@ -19,6 +19,24 @@ function injectFontStyle() {
   }
 }
 
+// Inject only the @font-face definition without globally overriding fonts.
+function injectFontFaceOnly() {
+  let existing = document.getElementById("farsiFontFaceOnly");
+  if (!existing) {
+    let style = document.createElement("style");
+    style.id = "farsiFontFaceOnly";
+    style.innerHTML = `
+      @font-face {
+        font-family: 'IRANSansXV';
+        src: url('${chrome.runtime.getURL("fonts/IRANSansXV.woff2")}') format('woff2'),
+             url('${chrome.runtime.getURL("fonts/IRANSansXV.woff")}') format('woff'),
+             url('${chrome.runtime.getURL("fonts/IRANSansXVF.ttf")}') format('truetype');
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
 function removeFontStyle() {
   let existing = document.getElementById("farsiFontStyle");
   if (existing) {
@@ -193,6 +211,7 @@ if (typeof window.proFarsiInitialized === 'undefined') {
   /**
    * Apply auto-direction to all text-bearing elements inside a container.
    * Respects manually set dir attributes; marks injected attrs with data-profarsi-auto-dir="1".
+   * Additionally, when dir is 'rtl', forces IRANSansXV font and remembers previous inline font.
    */
   function applySmartLayout(root) {
     const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th, dt, dd, label, span, a, div, blockquote, figcaption, summary, caption, button';
@@ -203,9 +222,18 @@ if (typeof window.proFarsiInitialized === 'undefined') {
       const text = el.textContent || '';
       if (text.trim().length === 0) return;
       const dir = detectDirection(text);
+
       el.setAttribute('dir', dir);
       el.setAttribute('data-profarsi-auto-dir', '1');
       el.style.textAlign = dir === 'rtl' ? 'right' : 'left';
+
+      // When element is RTL, force IRANSansXV and keep previous inline font-family
+      if (dir === 'rtl') {
+        if (!el.hasAttribute('data-profarsi-prev-font')) {
+          el.setAttribute('data-profarsi-prev-font', el.style.fontFamily || '');
+        }
+        el.style.fontFamily = "IRANSansXV, sans-serif";
+      }
     });
   }
 
@@ -214,6 +242,12 @@ if (typeof window.proFarsiInitialized === 'undefined') {
       el.removeAttribute('dir');
       el.removeAttribute('data-profarsi-auto-dir');
       el.style.textAlign = '';
+
+      if (el.hasAttribute('data-profarsi-prev-font')) {
+        const prev = el.getAttribute('data-profarsi-prev-font') || '';
+        el.style.fontFamily = prev;
+        el.removeAttribute('data-profarsi-prev-font');
+      }
     });
   }
 
@@ -229,6 +263,8 @@ if (typeof window.proFarsiInitialized === 'undefined') {
       }
       smartLayoutActive = false;
     } else {
+      // Ensure IRANSans font-face is defined so IRANSansXV is available for RTL elements
+      injectFontFaceOnly();
       applySmartLayout();
       smartLayoutObserver = new MutationObserver(mutations => {
         mutations.forEach(mutation => {

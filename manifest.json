@@ -19,15 +19,15 @@
   },
   "commands": {
     "toggle-font": {
-      "suggested_key": { "default": "Ctrl+Shift+1", "mac": "Command+Alt+1" },
+      "suggested_key": { "default": "Ctrl+Shift+1", "mac": "Command+Shift+1" },
       "description": "Toggle Persian font (IRANSans)"
     },
     "toggle-smart-layout": {
-      "suggested_key": { "default": "Ctrl+Shift+2", "mac": "Command+Alt+2" },
+      "suggested_key": { "default": "Ctrl+Shift+2", "mac": "Command+Shift+S" },
       "description": "Toggle Smart Layout (auto RTL/LTR detection)"
     },
     "toggle-rtl": {
-      "suggested_key": { "default": "Ctrl+Shift+3", "mac": "Command+Alt+3" },
+      "suggested_key": { "default": "Ctrl+Shift+3", "mac": "Command+Shift+K" },
       "description": "Toggle RTL direction for entire page"
     },
     "decrease-font-size": {
