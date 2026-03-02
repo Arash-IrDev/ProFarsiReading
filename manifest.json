@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ProFarsiReading",
-  "version": "1.0",
-  "description": "Toggle Persian font (IRANSans) and adjust font size for better reading experience.",
+  "version": "1.1",
+  "description": "Toggle Persian font (IRANSans), Smart RTL/LTR layout detection, and font size control.",
   "permissions": ["activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "icons": {
@@ -18,21 +18,23 @@
     "service_worker": "background.js"
   },
   "commands": {
-    "reset-font-size": {
-      "suggested_key": { "default": "Ctrl+Shift+0" },
-      "description": "Reset font size"
-    },
-    "increase-font-size": {
-      "suggested_key": { "default": "Ctrl+Shift+9" },
-      "description": "Increase font size"
-    },
     "toggle-font": {
-      "suggested_key": { "default": "Ctrl+Shift+1" },
-      "description": "Toggle Persian font"
+      "suggested_key": { "default": "Ctrl+Shift+1", "mac": "Command+Alt+1" },
+      "description": "Toggle Persian font (IRANSans)"
+    },
+    "toggle-smart-layout": {
+      "suggested_key": { "default": "Ctrl+Shift+2", "mac": "Command+Alt+2" },
+      "description": "Toggle Smart Layout (auto RTL/LTR detection)"
     },
     "toggle-rtl": {
-      "suggested_key": { "default": "Ctrl+Shift+2" },
-      "description": "Toggle RTL direction"
+      "suggested_key": { "default": "Ctrl+Shift+3", "mac": "Command+Alt+3" },
+      "description": "Toggle RTL direction for entire page"
+    },
+    "decrease-font-size": {
+      "description": "Decrease font size"
+    },
+    "reset-font-size": {
+      "description": "Reset font size"
     }
   },
   "content_scripts": [
