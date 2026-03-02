@@ -209,23 +209,45 @@ if (typeof window.proFarsiInitialized === 'undefined') {
   }
 
   /**
-   * Apply auto-direction to all text-bearing elements inside a container.
+   * Returns only the text that belongs directly to this element (its own text nodes),
+   * excluding text inside child elements. This prevents container divs from being
+   * judged by their descendants' content.
+   */
+  function getDirectText(el) {
+    let text = '';
+    el.childNodes.forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      }
+    });
+    return text;
+  }
+
+  /**
+   * Apply auto-direction to elements that directly contain their own text.
+   * Skips structural containers (elements whose own text nodes are empty).
    * Respects manually set dir attributes; marks injected attrs with data-profarsi-auto-dir="1".
    * Additionally, when dir is 'rtl', forces IRANSansXV font and remembers previous inline font.
    */
   function applySmartLayout(root) {
-    const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th, dt, dd, label, span, a, div, blockquote, figcaption, summary, caption, button';
+    const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th, dt, dd, label, span, a, b, strong, div, blockquote, figcaption, summary, caption, button';
     const elements = (root || document).querySelectorAll(selectors);
     elements.forEach(el => {
       // Skip elements where the user manually set dir (not us)
       if (el.hasAttribute('dir') && el.getAttribute('data-profarsi-auto-dir') !== '1') return;
-      const text = el.textContent || '';
+      // Only judge based on direct text nodes, not descendants
+      const text = getDirectText(el);
       if (text.trim().length === 0) return;
       const dir = detectDirection(text);
 
       el.setAttribute('dir', dir);
       el.setAttribute('data-profarsi-auto-dir', '1');
-      el.style.textAlign = dir === 'rtl' ? 'right' : 'left';
+      // For RTL we force right alignment; for LTR we keep site's default alignment.
+      if (dir === 'rtl') {
+        el.style.textAlign = 'right';
+      } else {
+        el.style.textAlign = '';
+      }
 
       // When element is RTL, force IRANSansXV and keep previous inline font-family
       if (dir === 'rtl') {
