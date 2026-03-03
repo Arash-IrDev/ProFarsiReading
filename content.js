@@ -223,11 +223,42 @@ if (typeof window.proFarsiInitialized === 'undefined') {
     return text;
   }
 
+  // CSS display values that accept text-align (block-level containers)
+  const BLOCK_DISPLAYS = new Set([
+    'block', 'inline-block', 'flex', 'inline-flex', 'grid', 'inline-grid',
+    'list-item', 'table-cell', 'table-caption', 'flow-root'
+  ]);
+
+  function isBlockLike(el) {
+    const display = window.getComputedStyle(el).display;
+    return BLOCK_DISPLAYS.has(display) || display.startsWith('table');
+  }
+
+  /**
+   * For a pure inline element (e.g. span inside td), text-align has no effect.
+   * Walk up to find the nearest block-level ancestor to apply text-align there instead.
+   * The ancestor is tagged with data-profarsi-parent-align so we can clean up later.
+   */
+  function applyAlignToBlockAncestor(el) {
+    let parent = el.parentElement;
+    while (parent && parent !== document.body) {
+      if (isBlockLike(parent)) {
+        if (!parent.hasAttribute('data-profarsi-parent-align')) {
+          parent.setAttribute('data-profarsi-parent-align', parent.style.textAlign || '');
+          parent.style.textAlign = 'right';
+        }
+        return;
+      }
+      parent = parent.parentElement;
+    }
+  }
+
   /**
    * Apply auto-direction to elements that directly contain their own text.
    * Skips structural containers (elements whose own text nodes are empty).
+   * For inline RTL elements, propagates text-align:right to the nearest block ancestor.
    * Respects manually set dir attributes; marks injected attrs with data-profarsi-auto-dir="1".
-   * Additionally, when dir is 'rtl', forces IRANSansXV font and remembers previous inline font.
+   * When dir is 'rtl', forces IRANSansXV font and remembers previous inline font.
    */
   function applySmartLayout(root) {
     const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th, dt, dd, label, span, a, b, strong, div, blockquote, figcaption, summary, caption, button';
@@ -242,32 +273,43 @@ if (typeof window.proFarsiInitialized === 'undefined') {
 
       el.setAttribute('dir', dir);
       el.setAttribute('data-profarsi-auto-dir', '1');
-      // For RTL we force right alignment; for LTR we keep site's default alignment.
-      if (dir === 'rtl') {
-        el.style.textAlign = 'right';
-      } else {
-        el.style.textAlign = '';
-      }
 
-      // When element is RTL, force IRANSansXV and keep previous inline font-family
       if (dir === 'rtl') {
+        if (isBlockLike(el)) {
+          // Block elements: text-align works directly
+          el.style.textAlign = 'right';
+        } else {
+          // Inline elements (span, a, etc.): propagate alignment to parent block
+          applyAlignToBlockAncestor(el);
+        }
+
+        // Force IRANSansXV and remember previous inline font-family
         if (!el.hasAttribute('data-profarsi-prev-font')) {
           el.setAttribute('data-profarsi-prev-font', el.style.fontFamily || '');
         }
-        el.style.fontFamily = "IRANSansXV, sans-serif";
+        el.style.fontFamily = 'IRANSansXV, sans-serif';
+      } else {
+        // LTR: leave alignment at site default
+        el.style.textAlign = '';
       }
     });
   }
 
   function removeSmartLayout() {
+    // Restore text-align on block ancestors that were tagged by us
+    document.querySelectorAll('[data-profarsi-parent-align]').forEach(el => {
+      el.style.textAlign = el.getAttribute('data-profarsi-parent-align') || '';
+      el.removeAttribute('data-profarsi-parent-align');
+    });
+
+    // Restore dir, text-align, and font on all processed elements
     document.querySelectorAll('[data-profarsi-auto-dir="1"]').forEach(el => {
       el.removeAttribute('dir');
       el.removeAttribute('data-profarsi-auto-dir');
       el.style.textAlign = '';
 
       if (el.hasAttribute('data-profarsi-prev-font')) {
-        const prev = el.getAttribute('data-profarsi-prev-font') || '';
-        el.style.fontFamily = prev;
+        el.style.fontFamily = el.getAttribute('data-profarsi-prev-font') || '';
         el.removeAttribute('data-profarsi-prev-font');
       }
     });
