@@ -223,6 +223,55 @@ if (typeof window.proFarsiInitialized === 'undefined') {
     return text;
   }
 
+  // Semantic blocks use full text (incl. descendants) so e.g. <li><p>…</p></li> gets RTL.
+  // Structural containers (div) keep direct-text-only to avoid wrapping whole pages.
+  const BLOCK_FULL_TEXT_TAGS = new Set([
+    'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TD', 'TH', 'DT', 'DD',
+    'LABEL', 'BLOCKQUOTE', 'FIGCAPTION', 'SUMMARY', 'CAPTION', 'BUTTON'
+  ]);
+
+  // Inline elements must NOT receive dir — it breaks bidi for patterns like "Dogfooding: متن".
+  const INLINE_TAGS = new Set(['SPAN', 'A', 'B', 'STRONG', 'I', 'EM', 'U', 'CODE']);
+
+  function getTextForDirection(el) {
+    if (BLOCK_FULL_TEXT_TAGS.has(el.tagName)) {
+      return el.textContent || '';
+    }
+    return getDirectText(el);
+  }
+
+  function applyRtlFont(el) {
+    if (!el.hasAttribute('data-profarsi-prev-font')) {
+      el.setAttribute('data-profarsi-prev-font', el.style.fontFamily || '');
+    }
+    el.style.fontFamily = 'IRANSansXV, sans-serif';
+  }
+
+  function clearRtlFont(el) {
+    if (el.hasAttribute('data-profarsi-prev-font')) {
+      el.style.fontFamily = el.getAttribute('data-profarsi-prev-font') || '';
+      el.removeAttribute('data-profarsi-prev-font');
+    }
+  }
+
+  function injectSmartLayoutStyles() {
+    if (document.getElementById('profarsiSmartLayoutStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'profarsiSmartLayoutStyles';
+    style.textContent = `
+      li[data-profarsi-auto-dir="1"][dir="rtl"]::before {
+        left: auto !important;
+        right: 0 !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function removeSmartLayoutStyles() {
+    const style = document.getElementById('profarsiSmartLayoutStyles');
+    if (style) style.remove();
+  }
+
   // CSS display values that accept text-align (block-level containers)
   const BLOCK_DISPLAYS = new Set([
     'block', 'inline-block', 'flex', 'inline-flex', 'grid', 'inline-grid',
@@ -254,48 +303,52 @@ if (typeof window.proFarsiInitialized === 'undefined') {
   }
 
   /**
-   * Apply auto-direction to elements that directly contain their own text.
-   * Skips structural containers (elements whose own text nodes are empty).
-   * For inline RTL elements, propagates text-align:right to the nearest block ancestor.
+   * Apply auto-direction to block elements; inline elements get font tweaks only (no dir).
+   * Block elements use full descendant text so <li><p>…</p></li> inherits RTL for markers.
+   * Skipping dir on inline tags preserves Unicode bidi for "English: فارسی" label patterns.
    * Respects manually set dir attributes; marks injected attrs with data-profarsi-auto-dir="1".
-   * When dir is 'rtl', forces IRANSansXV font and remembers previous inline font.
    */
   function applySmartLayout(root) {
-    const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th, dt, dd, label, span, a, b, strong, div, blockquote, figcaption, summary, caption, button';
+    const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th, dt, dd, label, span, a, b, strong, i, em, u, code, div, blockquote, figcaption, summary, caption, button';
     const elements = (root || document).querySelectorAll(selectors);
     elements.forEach(el => {
       // Skip elements where the user manually set dir (not us)
       if (el.hasAttribute('dir') && el.getAttribute('data-profarsi-auto-dir') !== '1') return;
-      // Only judge based on direct text nodes, not descendants
-      const text = getDirectText(el);
+
+      const text = getTextForDirection(el);
       if (text.trim().length === 0) return;
       const dir = detectDirection(text);
+
+      // Inline: font only — never set dir (breaks mixed "Label: text" bidi)
+      if (INLINE_TAGS.has(el.tagName)) {
+        if (dir === 'rtl') {
+          applyRtlFont(el);
+        } else {
+          clearRtlFont(el);
+        }
+        return;
+      }
 
       el.setAttribute('dir', dir);
       el.setAttribute('data-profarsi-auto-dir', '1');
 
       if (dir === 'rtl') {
         if (isBlockLike(el)) {
-          // Block elements: text-align works directly
           el.style.textAlign = 'right';
         } else {
-          // Inline elements (span, a, etc.): propagate alignment to parent block
           applyAlignToBlockAncestor(el);
         }
-
-        // Force IRANSansXV and remember previous inline font-family
-        if (!el.hasAttribute('data-profarsi-prev-font')) {
-          el.setAttribute('data-profarsi-prev-font', el.style.fontFamily || '');
-        }
-        el.style.fontFamily = 'IRANSansXV, sans-serif';
+        applyRtlFont(el);
       } else {
-        // LTR: leave alignment at site default
         el.style.textAlign = '';
+        clearRtlFont(el);
       }
     });
   }
 
   function removeSmartLayout() {
+    removeSmartLayoutStyles();
+
     // Restore text-align on block ancestors that were tagged by us
     document.querySelectorAll('[data-profarsi-parent-align]').forEach(el => {
       el.style.textAlign = el.getAttribute('data-profarsi-parent-align') || '';
@@ -307,11 +360,12 @@ if (typeof window.proFarsiInitialized === 'undefined') {
       el.removeAttribute('dir');
       el.removeAttribute('data-profarsi-auto-dir');
       el.style.textAlign = '';
+      clearRtlFont(el);
+    });
 
-      if (el.hasAttribute('data-profarsi-prev-font')) {
-        el.style.fontFamily = el.getAttribute('data-profarsi-prev-font') || '';
-        el.removeAttribute('data-profarsi-prev-font');
-      }
+    // Restore font on inline elements that only received font tweaks
+    document.querySelectorAll('[data-profarsi-prev-font]').forEach(el => {
+      clearRtlFont(el);
     });
   }
 
@@ -329,6 +383,7 @@ if (typeof window.proFarsiInitialized === 'undefined') {
     } else {
       // Ensure IRANSans font-face is defined so IRANSansXV is available for RTL elements
       injectFontFaceOnly();
+      injectSmartLayoutStyles();
       applySmartLayout();
       smartLayoutObserver = new MutationObserver(mutations => {
         mutations.forEach(mutation => {
